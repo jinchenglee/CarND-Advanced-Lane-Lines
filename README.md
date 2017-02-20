@@ -17,7 +17,8 @@ As part of Udacity Autonomous Driving Nano-Degree, the goals / steps of this pro
 
 [image0]: ./camera_cal/calibration1.jpg "Distorted"
 [image1]: ./camera_cal/test_undist.jpg "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
+[image2]: ./test_images/test1.jpg "Road Original"
+[image2a]: ./test_images/test1_undistorted.png "Road Transformed"
 [image3]: ./test_images/test1_binary.png "Binary Example"
 [image4]: ./examples/warped_straight_lines.jpg "Warp Example"
 [image5]: ./examples/color_fit_lines.jpg "Fit Visual"
@@ -87,8 +88,21 @@ Axises are lines connecting above points. Please be noticed the Z axis is negati
 ###Pipeline (single images)
 
 ####1. Provide an example of a distortion-corrected image.
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
-![alt text][image2]
+Loading previously saved parameters in pickle file when I did camera calibration using checkerboard, I used OpenCV API undistort to do image distortion-correction before any further processing as below. 
+
+```python
+# Undistort
+f = open('camera_cal/wide_dist_pickle.p', 'rb')
+param = pickle.load(f)
+K = param["mtx"]        # Camera intrinsic matrix
+d = param["dist"]       # Distortion parameters
+image = cv2.undistort(image, K, d, None, K)
+mpimg.imsave("test_images/test1_undistorted.png", image)
+```
+
+The distortion-corrected image example:
+![alt text][image2a]
+
 ####2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 I used a combination of AOI (area of interest), color and gradient thresholds to generate a binary image.  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
 

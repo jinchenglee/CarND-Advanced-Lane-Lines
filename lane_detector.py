@@ -49,10 +49,22 @@ def pipeline(img, s_thresh=(170, 255), sx_thresh=(20, 100), sobel_ksize=5):
     binary[(sxbinary==1) | (s_binary==1)] = 1
     return binary
 
+
+
 # Read in an test image
 image = mpimg.imread('test_images/test1.jpg')
-# Process
+
+# Undistort
+f = open('camera_cal/wide_dist_pickle.p', 'rb')
+param = pickle.load(f)
+K = param["mtx"]        # Camera intrinsic matrix
+d = param["dist"]       # Distortion parameters
+image = cv2.undistort(image, K, d, None, K)
+mpimg.imsave("test_images/test1_undistorted.png", image)
+
+# Process lane detection filters
 result = pipeline(image)
+
 # Write binary image out
-mpimg.imsave("test_images/test1_binary.png", results[0], cmap='gray')
+mpimg.imsave("test_images/test1_binary.png", result, cmap='gray')
 
