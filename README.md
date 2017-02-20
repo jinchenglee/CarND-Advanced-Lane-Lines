@@ -56,6 +56,32 @@ Undistorted image:
 ![alt text][image1]
 
 Draw the "world coordinates axises" on one of the checkerboard image.
+
+```
+	...
+	# OpenCV API returns:
+	#  mtx (intrinsic matrix), dist (distortion parameters), 
+	#  rvecs (Rodriguez vector), tvecs (Translation vector)
+	ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size,None,None)
+	...
+	
+	# --------------------
+	# World co-ordinates of axis points
+	# --------------------
+	objp = np.array([
+    	[0.,0.,0.], # Origin
+    	[3.,0.,0.], # X
+    	[0.,3.,0.], # Y
+    	[0.,0.,-3.] # -Z
+	])
+
+	# Project above points to a specific image
+	image_pt, _ = cv2.projectPoints(objp, rvecs[0], tvecs[0], mtx, dist)
+
+```
+
+Axises showing lines connecting above points. Please be noticed the Z axis is negative. Also, the abosolute dimension is missing here, which is unnecessary to derive camera intrinsic and extrinsic matrices in calibration process for mono-camera using Zhang's method. 
+
 ![alt text][image7]
 
 ###Pipeline (single images)
