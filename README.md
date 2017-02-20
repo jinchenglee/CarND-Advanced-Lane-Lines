@@ -18,7 +18,7 @@ As part of Udacity Autonomous Driving Nano-Degree, the goals / steps of this pro
 [image0]: ./camera_cal/calibration1.jpg "Distorted"
 [image1]: ./camera_cal/test_undist.jpg "Undistorted"
 [image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
+[image3]: ./test_images/test1_binary.png "Binary Example"
 [image4]: ./examples/warped_straight_lines.jpg "Warp Example"
 [image5]: ./examples/color_fit_lines.jpg "Fit Visual"
 [image6]: ./examples/example_output.jpg "Output"
@@ -70,9 +70,9 @@ Draw the "world coordinates axises" on one of the checkerboard image.
 	# --------------------
 	objp = np.array([
     	[0.,0.,0.], # Origin
-    	[3.,0.,0.], # X
-    	[0.,3.,0.], # Y
-    	[0.,0.,-3.] # -Z
+    	[3.,0.,0.], # X (red axis)
+    	[0.,3.,0.], # Y (green axis)
+    	[0.,0.,-3.] # -Z (blue axis)
 	])
 
 	# Project above points to a specific image
@@ -80,7 +80,7 @@ Draw the "world coordinates axises" on one of the checkerboard image.
 
 ```
 
-Axises showing lines connecting above points. Please be noticed the Z axis is negative. Also, the abosolute dimension is missing here, which is unnecessary to derive camera intrinsic and extrinsic matrices in calibration process for mono-camera using Zhang's method. 
+Axises are lines connecting above points. Please be noticed the Z axis is negative. Also, the abosolute dimension is missing here, which is unnecessary to derive camera intrinsic and extrinsic matrices in calibration process for mono-camera using Zhang's method. 
 
 ![alt text][image7]
 
@@ -90,7 +90,36 @@ Axises showing lines connecting above points. Please be noticed the Z axis is ne
 To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
 ![alt text][image2]
 ####2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+I used a combination of AOI (area of interest), color and gradient thresholds to generate a binary image.  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+
+```
+    # Convert to HSV color space and separate the V channel
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
+
+    # AOI (area of interest) mask - we only care about lower part of the image
+    size_x, size_y, size_ch = hsv.shape
+    hsv[0:size_x//2,:,:] = 0
+    l_channel = hsv[:,:,1]
+    s_channel = hsv[:,:,2]
+
+    # Sobel x on L channel
+    sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0, ksize=sobel_ksize) # Take the derivative in x
+    abs_sobelx = np.absolute(sobelx) # Absolute x derivative to accentuate lines away from horizontal
+    scaled_sobel = np.uint8(255*abs_sobelx/np.max(abs_sobelx))
+
+    # Threshold x gradient
+    sxbinary = np.zeros_like(scaled_sobel)
+    sxbinary[(scaled_sobel >= sx_thresh[0]) & (scaled_sobel <= sx_thresh[1])] = 1
+
+    # Threshold Saturation color channel
+    s_binary = np.zeros_like(s_channel)
+    scaled_s_ch = np.uint8(255*s_channel/np.max(s_channel))
+    s_binary[(scaled_s_ch >= s_thresh[0]) & (scaled_s_ch <= s_thresh[1])] = 1
+
+    # Combine the output - OR the two selections.
+    binary = np.zeros_like(s_channel)
+    binary[(sxbinary==1) | (s_binary==1)] = 1
+```
 
 ![alt text][image3]
 
