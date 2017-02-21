@@ -143,7 +143,7 @@ I used a combination of AOI (area of interest), color and gradient thresholds to
 
 The code for my perspective transform includes a function called `warper()`, which appears in top lines in the file `perspective.py`.  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
 
-```
+```python
 src = np.float32(
     [[(img_size[0] / 2) - 65, img_size[1] / 2 + 100],
     [((img_size[0] / 6) - 10), img_size[1]],
@@ -179,7 +179,7 @@ Verified on another sample image after warping:
 
 ####4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this in lane_detector.py:
 
 ![alt text][image5]
 

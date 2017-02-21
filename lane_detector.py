@@ -4,16 +4,19 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import pickle
 import glob
+import sys
 
-# ### Processing pipeline
-# 
-# Parameters to detect:
-# 1. Leverage HLS color space. 
-# 2. Gradients threshold.
-# 3. Area of interest mask.
 
 # Lane detection pipeline
 def pipeline(img, s_thresh=(170, 255), sx_thresh=(20, 100), sobel_ksize=5):
+    '''
+    Processing pipeline
+    
+    1. Leverage HLS color space. 
+    2. Gradients threshold.
+    3. Area of interest mask.
+    '''
+
     img = np.copy(img)
     # Convert to HSV color space and separate the V channel
     hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
@@ -126,19 +129,19 @@ def curve_fit_1st(binary_warped):
     right_fit = np.polyfit(righty, rightx, 2)
     
     # Visualization
-    ## Generate x and y values for plotting
-    #ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
-    #left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-    #right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
-    #
-    #out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-    #out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-    #plt.imshow(out_img)
-    #plt.plot(left_fitx, ploty, color='yellow')
-    #plt.plot(right_fitx, ploty, color='yellow')
-    #plt.xlim(0, 1280)
-    #plt.ylim(720, 0)
-    #plt.savefig('test_images/test1_curve_fit_window_search.png')
+    # Generate x and y values for plotting
+    ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+    left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+    right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+    
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+    plt.imshow(out_img)
+    plt.plot(left_fitx, ploty, color='yellow')
+    plt.plot(right_fitx, ploty, color='yellow')
+    plt.xlim(0, 1280)
+    plt.ylim(720, 0)
+    plt.savefig('test_images/test1_curve_fit_window_search.png')
 
     return out_img, left_fit, right_fit
 
@@ -162,40 +165,67 @@ def curve_fit(binary_warped, left_fit, right_fit):
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
     
-    ##Visualize
-    ## Generate x and y values for plotting
-    #ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
-    #left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-    #right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
-    ## Create an image to draw on and an image to show the selection window
-    #out_img = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
-    #window_img = np.zeros_like(out_img)
-    ## Color in left and right line pixels
-    #out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-    #out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-    ## Generate a polygon to illustrate the search window area
-    ## And recast the x and y points into usable format for cv2.fillPoly()
-    #left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
-    #left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, ploty])))])
-    #left_line_pts = np.hstack((left_line_window1, left_line_window2))
-    #right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
-    #right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, ploty])))])
-    #right_line_pts = np.hstack((right_line_window1, right_line_window2))
-    ## Draw the lane onto the warped blank image
-    #cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
-    #cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
-    #result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-    #plt.imshow(result)
-    #plt.plot(left_fitx, ploty, color='yellow')
-    #plt.plot(right_fitx, ploty, color='yellow')
-    #plt.xlim(0, 1280)
-    #plt.ylim(720, 0)    
-    #plt.savefig("test_images/test1_curve_fit_2.png")
+    #Visualize
+    # Generate x and y values for plotting
+    ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+    left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+    right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+    # Create an image to draw on and an image to show the selection window
+    out_img = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
+    window_img = np.zeros_like(out_img)
+    # Color in left and right line pixels
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+    # Generate a polygon to illustrate the search window area
+    # And recast the x and y points into usable format for cv2.fillPoly()
+    left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
+    left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, ploty])))])
+    left_line_pts = np.hstack((left_line_window1, left_line_window2))
+    right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
+    right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, ploty])))])
+    right_line_pts = np.hstack((right_line_window1, right_line_window2))
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
+    cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
+    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+    plt.imshow(result)
+    plt.plot(left_fitx, ploty, color='yellow')
+    plt.plot(right_fitx, ploty, color='yellow')
+    plt.xlim(0, 1280)
+    plt.ylim(720, 0)    
+    plt.savefig("test_images/test1_curve_fit_2.png")
+
+    # Measure curvature
+    ym_per_pix = 30/720 # Assuming 30 meters per pixel in y dimenstion
+    xm_per_pix = 3.7/700 # 3.7 meters per pixel in x dimenstion
+
+    ploty = np.linspace(0,719, num=720)
+    leftx= left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+    rightx= right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+
+    y_eval = np.max(ploty) # Select the bottom line position to evaluate
+    # Fit new polynomials to x,y in world space
+    left_fit_cr = np.polyfit(ploty*ym_per_pix, leftx*xm_per_pix, 2)
+    right_fit_cr = np.polyfit(ploty*ym_per_pix, rightx*xm_per_pix, 2)
+    # Calculate the new radii of curvature
+    left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
+    right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
+    # Now our radius of curvature is in meters
+    print(left_curverad, 'm', right_curverad, 'm')
 
     return left_fit, right_fit
 
+# -------------------------------------
+# Command line argument processing
+# -------------------------------------
+if len(sys.argv) < 2:
+    print("Missing image file.")
+    print("python3 lane_detector.py <image_file>")
+
+FILE = str(sys.argv[1])
+
 # Read in an test image
-image = mpimg.imread('test_images/test1.jpg')
+image = mpimg.imread(FILE)
 
 # Undistort
 f = open('camera_cal/wide_dist_pickle.p', 'rb')
@@ -224,7 +254,7 @@ mpimg.imsave("test_images/test1_binary_warp.png", binary_warped, cmap='gray')
 
 # Curve fit for the 1st frame
 curve_fit_img, cur_left_fit, cur_right_fit = curve_fit_1st(binary_warped)
-#mpimg.imsave("test_images/test1_curve_fit_1.png", curve_fit_img)
+mpimg.imsave("test_images/test1_curve_fit_1.png", curve_fit_img)
 print("left_fit = ", cur_left_fit)
 print("right_fit = ", cur_right_fit)
 
