@@ -23,6 +23,8 @@ As part of Udacity Autonomous Driving Nano-Degree, the goals / steps of this pro
 [image4]: ./examples/warped_straight_lines.jpg "Warp Example"
 [image4a]: ./test_images/straight_lines2_warp.png "Warp Example 2"
 [image5]: ./examples/color_fit_lines.jpg "Fit Visual"
+[image5a]: ./test_images/test1_curve_fit_window_search.png "Searching windows"
+[image5b]: ./examples/histogram_lane_pixels.png "Lane pixels histogram"
 [image6]: ./examples/example_output.jpg "Output"
 [image7]: ./camera_cal/added_rgb_axis.jpg
 [video1]: ./project_video.mp4 "Video"
@@ -135,7 +137,6 @@ I used a combination of AOI (area of interest), color and gradient thresholds to
     binary = np.zeros_like(s_channel)
     binary[(sxbinary==1) | (s_binary==1)] = 1
 ```
-
 ![alt text][image3]
 
 ####3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
@@ -181,6 +182,40 @@ Verified on another sample image after warping:
 Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
 
 ![alt text][image5]
+
+It starts with histogram of image columns. the left/right lane pixels should have histogram peaks in left and right side if searching from mid-point. 
+```python
+    # Take a histogram of the bottom half of the image
+    histogram = np.sum(binary_warped[binary_warped.shape[0]//2:,:], axis=0)
+
+    # Find the peak of the left and right halves of the histogram
+    # These will be the starting point for the left and right lines
+    midpoint = np.int(histogram.shape[0]/2)
+    leftx_base = np.argmax(histogram[:midpoint])
+    rightx_base = np.argmax(histogram[midpoint:]) + midpoint
+
+```
+The peaks are set to be starting base points of left/right lanes. 
+![alt text][image5b]
+
+Then a window searching approach is taken to gradually search upwards from the left/right base point to find points clustered right above. These newly found points are meaned to find new base points for next round of window search upwards. There are a total of 9 layers of windows as below. 
+
+![alt text][image5a]
+
+All the lane line pixels are saved for polynominal fit calculation.
+```python
+    # Extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds]
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+
+    # Fit a second order polynomial to each
+    left_fit = np.polyfit(lefty, leftx, 2)
+    right_fit = np.polyfit(righty, rightx, 2)
+```
+
+The `left_fit/right_fit` values (shape=[1,3]) are updated for each input frame image. Except for the very 1st frame when left_fit/right_fit don't exist, all follow up frames can do "smarter" window search along previous frame fit curve.
 
 ####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
