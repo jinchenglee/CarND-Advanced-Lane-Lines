@@ -59,12 +59,26 @@ f = open('camera_cal/wide_dist_pickle.p', 'rb')
 param = pickle.load(f)
 K = param["mtx"]        # Camera intrinsic matrix
 d = param["dist"]       # Distortion parameters
+f.close()
 image = cv2.undistort(image, K, d, None, K)
 mpimg.imsave("test_images/test1_undistorted.png", image)
 
 # Process lane detection filters
-result = pipeline(image)
+image_binary = pipeline(image)
 
 # Write binary image out
-mpimg.imsave("test_images/test1_binary.png", result, cmap='gray')
+mpimg.imsave("test_images/test1_binary.png", image_binary, cmap='gray')
 
+# Perspective transform
+warp_f = open('camera_cal/warp.p', 'rb')
+warp_param = pickle.load(warp_f)
+P = warp_param["warp"]
+warp_f.close()
+img_size = (image_binary.shape[1], image_binary.shape[0])
+image_warped = cv2.warpPerspective(image_binary, P, img_size, flags=cv2.INTER_NEAREST)
+mpimg.imsave("test_images/test1_binary_warp.png", image_warped, cmap='gray')
+
+# Histogram analysis
+histogram = np.sum(image_warped[image_warped.shape[0]//2:,:], axis=0)
+plt.plot(histogram)
+plt.show()

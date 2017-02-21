@@ -10,7 +10,7 @@ def warper(img, src, dst):
     img_size = (img.shape[1], img.shape[0])
     M = cv2.getPerspectiveTransform(src, dst)
     warped = cv2.warpPerspective(img, M, img_size, flags=cv2.INTER_NEAREST)  # keep same size as input image
-    return warped
+    return warped, M
 
 
 # Read in an test image
@@ -21,6 +21,7 @@ f = open('camera_cal/wide_dist_pickle.p', 'rb')
 param = pickle.load(f)
 K = param["mtx"]        # Camera intrinsic matrix
 d = param["dist"]       # Distortion parameters
+f.close()
 image = cv2.undistort(image, K, d, None, K)
 
 # Perspective transform 
@@ -36,12 +37,18 @@ dst = np.float32(
     [(img_size[0] / 4), img_size[1]],
     [(img_size[0] * 3 / 4), img_size[1]],
     [(img_size[0] * 3 / 4), 0]])
-warped = warper(image, src, dst)
+warped, _ = warper(image, src, dst)
 
 # Save warped image
 mpimg.imsave('test_images/straight_lines2_warp.png', warped)
 
 # Read in another test image to verify
 image = mpimg.imread('test_images/straight_lines1.jpg')
-warped = warper(image, src, dst)
+warped, P = warper(image, src, dst)
 mpimg.imsave('test_images/straight_lines1_warp.png', warped)
+
+# Save perspective transform matrix
+data = {"warp": P}
+warp_file = open('camera_cal/warp.p', 'wb')
+pickle.dump(data, warp_file)
+warp_file.close()
