@@ -218,48 +218,100 @@ def curve_fit(binary_warped, left_fit, right_fit):
 # -------------------------------------
 # Command line argument processing
 # -------------------------------------
-if len(sys.argv) < 2:
-    print("Missing image file.")
-    print("python3 lane_detector.py <image_file>")
+#if len(sys.argv) < 2:
+#    print("Missing image file.")
+#    print("python3 lane_detector.py <image_file>")
+#
+#FILE = str(sys.argv[1])
+#
+## Read in an test image
+#image = mpimg.imread(FILE)
 
-FILE = str(sys.argv[1])
-
-# Read in an test image
-image = mpimg.imread(FILE)
-
-# Undistort
+# Camera parameters
 f = open('camera_cal/wide_dist_pickle.p', 'rb')
 param = pickle.load(f)
 K = param["mtx"]        # Camera intrinsic matrix
 d = param["dist"]       # Distortion parameters
 f.close()
-image = cv2.undistort(image, K, d, None, K)
-mpimg.imsave("test_images/test1_undistorted.png", image)
 
-# Process lane detection filters
-image_binary = pipeline(image)
-
-# Write binary image out
-mpimg.imsave("test_images/test1_binary.png", image_binary, cmap='gray')
-
-# Perspective transform
+# Perspective transform parameter
 warp_f = open('camera_cal/warp.p', 'rb')
 warp_param = pickle.load(warp_f)
 P = warp_param["warp"]
 warp_f.close()
 
-img_size = (image_binary.shape[1], image_binary.shape[0])
-binary_warped = cv2.warpPerspective(image_binary, P, img_size, flags=cv2.INTER_NEAREST)
-mpimg.imsave("test_images/test1_binary_warp.png", binary_warped, cmap='gray')
+P_inv = np.linalg.inv(P)
 
-# Curve fit for the 1st frame
-curve_fit_img, cur_left_fit, cur_right_fit = curve_fit_1st(binary_warped)
-mpimg.imsave("test_images/test1_curve_fit_1.png", curve_fit_img)
-print("left_fit = ", cur_left_fit)
-print("right_fit = ", cur_right_fit)
+def video_pipeline(image, K, d, P, frame_cnt, cur_left_fit, cur_right_fit):
+    # Undistort
+    image = cv2.undistort(image, K, d, None, K)
 
-# Simulate the case to feed a "second" frame using curve_fit()
-left_fit, right_fit = curve_fit(binary_warped, cur_left_fit, cur_right_fit)
-print("left_fit = ", left_fit)
-print("right_fit = ", right_fit)
+    # Process lane detection filters
+    image_binary = pipeline(image)
+
+    # Perspective transform
+    img_size = (image_binary.shape[1], image_binary.shape[0])
+    binary_warped = cv2.warpPerspective(image_binary, P, img_size, flags=cv2.INTER_NEAREST)
+
+    # Curve fit for the 1st frame
+    if frame_cnt==1:
+        curve_fit_img, left_fit, right_fit = curve_fit_1st(binary_warped)
+        #print("left_fit = ", left_fit)
+        #print("right_fit = ", right_fit)
+    else:
+        # Simulate the case to feed a "second" frame using curve_fit()
+        left_fit, right_fit = curve_fit(binary_warped, cur_left_fit, cur_right_fit)
+        #print("left_fit = ", left_fit)
+        #print("right_fit = ", right_fit)
+
+    return binary_warped, left_fit, right_fit
+
+
+clip = cv2.VideoCapture("project_video.mp4")
+#clip = cv2.VideoCapture("challenge_video.mp4")
+fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+
+frame_cnt = 0
+frame_start = 0
+frame_end = 0xffffffff
+#frame_end = 50
+
+out=None
+l_fit = 0
+r_fit = 0
+
+while True:
+    flag, image = clip.read()
+    if flag:
+        frame_cnt += 1
+        if frame_cnt < frame_start:
+            continue
+        elif frame_cnt > frame_end:
+            break
+        print('frame_cnt = ', frame_cnt)
+        if out == None:
+            out = cv2.VideoWriter('output.avi', fourcc, 20.0, (image.shape[1], image.shape[0]))
+
+        h = image.shape[0]
+        w = image.shape[1]
+
+        # Video pipeline
+        binary_warped, l_fit, r_fit = video_pipeline(image, K, d, P, frame_cnt, l_fit, r_fit)
+        
+        color_binary = np.dstack((binary_warped, binary_warped, binary_warped))
+        res = np.array(color_binary*255, dtype='uint8')
+        # Convert back to map to road
+        
+        res = cv2.cvtColor(res, cv2.COLOR_RGB2BGR)
+        cv2.imshow('video', res)
+
+        out.write(res)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    else:
+        break
+
+
+
 
