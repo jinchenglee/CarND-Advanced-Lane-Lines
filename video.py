@@ -8,7 +8,7 @@ import sys
 
 
 # Lane detection pipeline
-def pipeline(img, s_thresh=(150, 255), sx_thresh=(30, 100), sobel_ksize=5):
+def pipeline(img, s_thresh=(170, 255), sx_thresh=(50, 150), sobel_ksize=5):
     '''
     Processing pipeline
     
@@ -29,7 +29,7 @@ def pipeline(img, s_thresh=(150, 255), sx_thresh=(30, 100), sobel_ksize=5):
 
     # Luma threshold
     l_binary = np.zeros_like(l_channel)
-    l_binary[l_channel>20]=1
+    l_binary[l_channel>30]=1
 
     # Sobel x on L channel
     sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0, ksize=sobel_ksize) # Take the derivative in x
