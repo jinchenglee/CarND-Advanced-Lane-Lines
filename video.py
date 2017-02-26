@@ -8,7 +8,7 @@ import sys
 
 
 # Lane detection pipeline
-def pipeline(img, s_thresh=(180, 255), sx_thresh=(30, 100), sobel_ksize=5):
+def pipeline(img, s_thresh=(150, 255), sx_thresh=(30, 100), sobel_ksize=5):
     '''
     Processing pipeline
     
@@ -19,13 +19,17 @@ def pipeline(img, s_thresh=(180, 255), sx_thresh=(30, 100), sobel_ksize=5):
 
     img = np.copy(img)
     # Convert to HSV color space and separate the V channel
-    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
+    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
     
     # AOI (area of interest) mask - we only care about lower part of the image
-    size_x, size_y, size_ch = hsv.shape
-    hsv[0:size_x//2,:,:] = 0
-    l_channel = hsv[:,:,1]
-    s_channel = hsv[:,:,2]
+    size_x, size_y, size_ch = hls.shape
+    hls[0:size_x//2,:,:] = 0
+    l_channel = hls[:,:,1]
+    s_channel = hls[:,:,2]
+
+    # Luma threshold
+    l_binary = np.zeros_like(l_channel)
+    l_binary[l_channel>20]=1
 
     # Sobel x on L channel
     sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0, ksize=sobel_ksize) # Take the derivative in x
@@ -49,7 +53,8 @@ def pipeline(img, s_thresh=(180, 255), sx_thresh=(30, 100), sobel_ksize=5):
     #color_binary = np.dstack((np.zeros_like(dir_binary), np.zeros_like(sxbinary), s_binary))
 
     binary = np.zeros_like(s_channel)
-    binary[(sxbinary==1) | (s_binary==1)] = 1
+    #binary[(sxbinary==1) | (s_binary==1)] = 1
+    binary[((sxbinary==1) | (s_binary==1)) & (l_binary==1)] = 1
     return binary
 
 def curve_fit_1st(binary_warped):
@@ -311,12 +316,13 @@ while True:
 
         # Evaluate whether the new curvature values make sense.
         NUM_HISTORY = 3
+        NUM_NOUPDATE = 6
         if len(left_fit)<NUM_HISTORY:
             left_fit.append(l_fit)
         else:
             l_avg = np.mean(np.array(left_fit), axis=0)
             l_std = np.std(np.array(left_fit), axis=0)
-            l = np.abs((l_fit - l_avg)/l_avg) < 0.4
+            l = np.abs((l_fit - l_avg)/l_avg) < 0.5
             if l.all():
                 print("l updated.")
                 left_fit.pop(0)
@@ -325,7 +331,7 @@ while True:
             else:
                 l_fit = l_avg
                 l_cnt += 1
-                if l_cnt > NUM_HISTORY:
+                if l_cnt > NUM_NOUPDATE:
                     print("l reset.")
                     left_fit = []
                     l_cnt = 0
@@ -335,7 +341,7 @@ while True:
         else:
             r_avg = np.mean(np.array(right_fit), axis=0)
             r_std = np.std(np.array(right_fit), axis=0)
-            r = np.abs((r_fit - r_avg)/r_avg) < 0.4
+            r = np.abs((r_fit - r_avg)/r_avg) < 0.5
             if r.all():
                 print("r updated.")
                 right_fit.pop(0)
@@ -344,7 +350,7 @@ while True:
             else:
                 r_fit = r_avg
                 r_cnt += 1
-                if r_cnt > NUM_HISTORY:
+                if r_cnt > NUM_NOUPDATE:
                     print("r reset.")
                     right_fit = []
                     r_cnt = 0
@@ -398,6 +404,7 @@ while True:
         # Warp the blank back to original image space using inverse perspective matrix (Minv)
         newwarp = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0]))
         # Combine the result with the original image
+        # TODO: Need to alpha blending with undistorted image.
         res = cv2.addWeighted(image, 1, newwarp, 0.3, 0)
 
         res = cv2.addWeighted(res, 1, res1, 0.5, 0)
