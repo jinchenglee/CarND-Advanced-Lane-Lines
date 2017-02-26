@@ -8,7 +8,7 @@ import sys
 
 
 # Lane detection pipeline
-def pipeline(img, s_thresh=(180, 255), sx_thresh=(35, 100), sobel_ksize=3):
+def pipeline(img, s_thresh=(180, 255), sx_thresh=(30, 100), sobel_ksize=5):
     '''
     Processing pipeline
     
@@ -215,6 +215,30 @@ def curve_fit(binary_warped, left_fit, right_fit):
 
     return left_fit, right_fit
 
+def video_pipeline(image, K, d, P, frame_cnt, cur_left_fit, cur_right_fit):
+    # Undistort
+    image = cv2.undistort(image, K, d, None, K)
+
+    # Process lane detection filters
+    image_binary = pipeline(image)
+
+    # Perspective transform
+    img_size = (image_binary.shape[1], image_binary.shape[0])
+    binary_warped = cv2.warpPerspective(image_binary, P, img_size, flags=cv2.INTER_NEAREST)
+
+    # Curve fit for the 1st frame
+    if frame_cnt<901:
+        curve_fit_img, left_fit, right_fit = curve_fit_1st(binary_warped)
+        #print("left_fit = ", left_fit)
+        #print("right_fit = ", right_fit)
+    else:
+        # Simulate the case to feed a "second" frame using curve_fit()
+        left_fit, right_fit = curve_fit(binary_warped, cur_left_fit, cur_right_fit)
+        #print("left_fit = ", left_fit)
+        #print("right_fit = ", right_fit)
+
+    return binary_warped, left_fit, right_fit
+
 # -------------------------------------
 # Command line argument processing
 # -------------------------------------
@@ -242,33 +266,10 @@ warp_f.close()
 
 P_inv = np.linalg.inv(P)
 
-def video_pipeline(image, K, d, P, frame_cnt, cur_left_fit, cur_right_fit):
-    # Undistort
-    image = cv2.undistort(image, K, d, None, K)
-
-    # Process lane detection filters
-    image_binary = pipeline(image)
-
-    # Perspective transform
-    img_size = (image_binary.shape[1], image_binary.shape[0])
-    binary_warped = cv2.warpPerspective(image_binary, P, img_size, flags=cv2.INTER_NEAREST)
-
-    # Curve fit for the 1st frame
-    if frame_cnt==1:
-        curve_fit_img, left_fit, right_fit = curve_fit_1st(binary_warped)
-        #print("left_fit = ", left_fit)
-        #print("right_fit = ", right_fit)
-    else:
-        # Simulate the case to feed a "second" frame using curve_fit()
-        left_fit, right_fit = curve_fit(binary_warped, cur_left_fit, cur_right_fit)
-        #print("left_fit = ", left_fit)
-        #print("right_fit = ", right_fit)
-
-    return binary_warped, left_fit, right_fit
-
 
 clip = cv2.VideoCapture("project_video.mp4")
-#clip = cv2.VideoCapture("harder_challenge_video.mp4")
+#clip = cv2.VideoCapture("frame_gt_900.avi")
+#clip = cv2.VideoCapture("challenge_video.mp4")
 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
 
 frame_cnt = 0
@@ -279,6 +280,12 @@ frame_end = 0xffffffff
 out=None
 l_fit = 0
 r_fit = 0
+
+l_cnt = 0
+r_cnt = 0
+
+left_fit = []
+right_fit = []
 
 # Generate x and y values for plotting
 ploty = np.linspace(0, 719, 720)
@@ -293,16 +300,88 @@ while True:
             break
         print('frame_cnt = ', frame_cnt)
         if out == None:
-            out = cv2.VideoWriter('output.avi', fourcc, 20.0, (image.shape[1], image.shape[0]))
+            out = cv2.VideoWriter('output.avi', fourcc, 30.0, (image.shape[1], image.shape[0]))
 
         h = image.shape[0]
         w = image.shape[1]
 
         # Video pipeline
         binary_warped, l_fit, r_fit = video_pipeline(image, K, d, P, frame_cnt, l_fit, r_fit)
-        
-        #color_binary = np.dstack((binary_warped, binary_warped, binary_warped))
-        #res = np.array(color_binary*255, dtype='uint8')
+        #print("raw l_fit = ", l_fit, "raw r_fit = ", r_fit)
+
+        # Evaluate whether the new curvature values make sense.
+        NUM_HISTORY = 3
+        if len(left_fit)<NUM_HISTORY:
+            left_fit.append(l_fit)
+        else:
+            l_avg = np.mean(np.array(left_fit), axis=0)
+            l_std = np.std(np.array(left_fit), axis=0)
+            l = np.abs((l_fit - l_avg)/l_avg) < 0.4
+            if l.all():
+                print("l updated.")
+                left_fit.pop(0)
+                left_fit.append(l_fit)
+                l_cnt = 0
+            else:
+                l_fit = l_avg
+                l_cnt += 1
+                if l_cnt > NUM_HISTORY:
+                    print("l reset.")
+                    left_fit = []
+                    l_cnt = 0
+
+        if len(right_fit)<NUM_HISTORY:
+            right_fit.append(r_fit)
+        else:
+            r_avg = np.mean(np.array(right_fit), axis=0)
+            r_std = np.std(np.array(right_fit), axis=0)
+            r = np.abs((r_fit - r_avg)/r_avg) < 0.4
+            if r.all():
+                print("r updated.")
+                right_fit.pop(0)
+                right_fit.append(r_fit)
+                r_cnt = 0
+            else:
+                r_fit = r_avg
+                r_cnt += 1
+                if r_cnt > NUM_HISTORY:
+                    print("r reset.")
+                    right_fit = []
+                    r_cnt = 0
+
+        # Bird's eye binary
+        color_binary = np.dstack((binary_warped, binary_warped, binary_warped))
+        res = np.array(color_binary*255, dtype='uint8')
+
+        #Visualize
+        margin = 80
+        nonzero = binary_warped.nonzero()
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        left_lane_inds = ((nonzerox > (l_fit[0]*(nonzeroy**2) + l_fit[1]*nonzeroy + l_fit[2] - margin)) & (nonzerox < (l_fit[0]*(nonzeroy**2) + l_fit[1]*nonzeroy + l_fit[2] + margin))) 
+        right_lane_inds = ((nonzerox > (r_fit[0]*(nonzeroy**2) + r_fit[1]*nonzeroy + r_fit[2] - margin)) & (nonzerox < (r_fit[0]*(nonzeroy**2) + r_fit[1]*nonzeroy + r_fit[2] + margin)))  
+        # Generate x and y values for plotting
+        ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+        l_fitx = l_fit[0]*ploty**2 + l_fit[1]*ploty + l_fit[2]
+        r_fitx = r_fit[0]*ploty**2 + r_fit[1]*ploty + r_fit[2]
+        # Create an image to draw on and an image to show the selection window
+        out_img = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
+        window_img = np.zeros_like(out_img)
+        # Color in left and right line pixels
+        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        # Generate a polygon to illustrate the search window area
+        # And recast the x and y points into usable format for cv2.fillPoly()
+        left_line_window1 = np.array([np.transpose(np.vstack([l_fitx-margin, ploty]))])
+        left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([l_fitx+margin, ploty])))])
+        left_line_pts = np.hstack((left_line_window1, left_line_window2))
+        right_line_window1 = np.array([np.transpose(np.vstack([r_fitx-margin, ploty]))])
+        right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([r_fitx+margin, ploty])))])
+        right_line_pts = np.hstack((right_line_window1, right_line_window2))
+        # Draw the lane onto the warped blank image
+        cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
+        cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
+        res1 = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
 
         # Convert back to map to road
         left_fitx = l_fit[0]*ploty**2 + l_fit[1]*ploty + l_fit[2]
@@ -317,13 +396,15 @@ while True:
         # Draw the lane onto the warped blank image
         cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
         # Warp the blank back to original image space using inverse perspective matrix (Minv)
-        newwarp = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0])) 
+        newwarp = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0]))
         # Combine the result with the original image
         res = cv2.addWeighted(image, 1, newwarp, 0.3, 0)
 
+        res = cv2.addWeighted(res, 1, res1, 0.5, 0)
+
         # Write video out
-        #res = cv2.cvtColor(res, cv2.COLOR_RGB2BGR)
         cv2.imshow('video', res)
+        #print("l_fit = ", l_fit, "r_fit = ", r_fit)
         out.write(res)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -331,6 +412,13 @@ while True:
     else:
         break
 
-
+## File to save curvature fit data
+#record = {}
+#curvature_file = open('curvature.p','wb')
+#record["l"] = left_fit
+#record["r"] = right_fit
+#pickle.dump(record, curvature_file)
+#curvature_file.close()
+#
 
 
