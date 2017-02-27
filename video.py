@@ -10,7 +10,7 @@ import lane
 
 
 # Lane detection pipeline
-def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_th=(50, 150), sobel_ksize=5):
+def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_th=(50, 150), sobel_ksize=5, visual_on=True):
     '''
     Processing pipeline
     
@@ -63,8 +63,9 @@ def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_t
     res = lane_shadow_on_road_img = lane.draw_lane_area(binary_warped, img, P_inv)
 
     # Optional: blending with visualization image
-    visualize_img = lane.visualize_fit(binary_warped)
-    res = cv2.addWeighted(res, 1, visualize_img, 0.5, 0)
+    if visual_on:
+        visualize_img = lane.visualize_fit(binary_warped)
+        res = cv2.addWeighted(res, 1, visualize_img, 0.5, 0)
 
     return res, detected
 
@@ -77,6 +78,10 @@ if len(sys.argv) < 2:
     print("python3 video.py <image_file>")
 
 FILE = str(sys.argv[1])
+
+VISUAL_ON = False
+if len(sys.argv)>2:
+    VISUAL_ON = True
 
 clip = cv2.VideoCapture(FILE)
 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
@@ -109,7 +114,7 @@ while True:
             out = cv2.VideoWriter('output.avi', fourcc, 30.0, (image.shape[1], image.shape[0]))
 
         # Video pipeline
-        res, detected = pipeline(lane, image, (frame_cnt==1) or (not(detected)))
+        res, detected = pipeline(lane, image, (frame_cnt==1) or (not(detected)), visual_on=VISUAL_ON)
 
         # Write video out
         cv2.imshow('video', res)

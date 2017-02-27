@@ -28,6 +28,8 @@ class lane():
         # No update counters
         self.l_cnt = 0
         self.r_cnt = 0
+        # Search window margin
+        self.margin = 100
 
     def get_param(self):
         # Camera parameters
@@ -64,13 +66,9 @@ class lane():
         # These will be the starting point for the left and right lines
         midpoint = np.int(histogram.shape[0]/2)
         # Search within a certain window
-        if not(self.detected): # First time or track lost
-            self.leftx_base = np.argmax(histogram[:midpoint])
-            self.rightx_base = np.argmax(histogram[midpoint:]) + midpoint
-        else: # Search around last base point
-            self.leftx_base = np.argmax(histogram[self.leftx_base-100:self.leftx_base+100])
-            self.rightx_base = np.argmax(histogram[self.rightx_base-100:self.rightx_base+100]) + midpoint
-        print("self.leftx_base = ", self.leftx_base, "self.rightx_base = ", self.rightx_base)
+        self.leftx_base = np.argmax(histogram[:midpoint])
+        self.rightx_base = np.argmax(histogram[midpoint:]) + midpoint
+        print("Rebase: self.leftx_base = ", self.leftx_base, "self.rightx_base = ", self.rightx_base)
         
         # Choose the number of sliding windows
         nwindows = 9
@@ -84,7 +82,6 @@ class lane():
         leftx_current = self.leftx_base
         rightx_current = self.rightx_base
         # Set the width of the windows +/- margin
-        margin = 80
         # Set minimum number of pixels found to recenter window
         minpix = 100
         # Create empty lists to receive left and right lane pixel indices
@@ -96,10 +93,10 @@ class lane():
             # Identify window boundaries in x and y (and right and left)
             win_y_low = binary_warped.shape[0] - (window+1)*window_height
             win_y_high = binary_warped.shape[0] - window*window_height
-            win_xleft_low = leftx_current - margin
-            win_xleft_high = leftx_current + margin
-            win_xright_low = rightx_current - margin
-            win_xright_high = rightx_current + margin
+            win_xleft_low = leftx_current - self.margin
+            win_xleft_high = leftx_current + self.margin
+            win_xright_low = rightx_current - self.margin
+            win_xright_high = rightx_current + self.margin
             if visualize:
                 # Draw the windows on the visualization image
                 cv2.rectangle(out_img,(win_xleft_low,win_y_low),(win_xleft_high,win_y_high),(0,255,0), 2) 
@@ -157,9 +154,8 @@ class lane():
         nonzero = binary_warped.nonzero()
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
-        margin = 80
-        left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] + margin))) 
-        right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] + margin)))  
+        left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] - self.margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] + self.margin))) 
+        right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] - self.margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] + self.margin)))  
         
         # Again, extract left and right line pixel positions
         leftx = nonzerox[left_lane_inds]
@@ -185,9 +181,8 @@ class lane():
         nonzero = binary_warped.nonzero()
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
-        margin = 80
-        left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] + margin))) 
-        right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] + margin)))  
+        left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] - self.margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] + self.margin))) 
+        right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] - self.margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] + self.margin)))  
  
         #Visualize
         # Generate x and y values for plotting
@@ -203,11 +198,11 @@ class lane():
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
         # Generate a polygon to illustrate the search window area
         # And recast the x and y points into usable format for cv2.fillPoly()
-        left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
-        left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, ploty])))])
+        left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-self.margin, ploty]))])
+        left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+self.margin, ploty])))])
         left_line_pts = np.hstack((left_line_window1, left_line_window2))
-        right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
-        right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, ploty])))])
+        right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-self.margin, ploty]))])
+        right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+self.margin, ploty])))])
         right_line_pts = np.hstack((right_line_window1, right_line_window2))
         # Draw the lane onto the warped blank image
         cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
@@ -270,7 +265,6 @@ class lane():
         # Update to use corrected l/r_fit
         self.cur_l_fit = l_fit
         self.cur_r_fit = r_fit
-
         return self.detected
  
     def draw_lane_area(self, binary_warped, image, P_inv):
@@ -335,8 +329,15 @@ class lane():
         #print("off center = ", off_center)
 
         # Update left/right x base
-        self.leftx_base = leftx
-        self.rightx_base = rightx
+        # Base x pixel position sanity check
+        if leftx<160 or leftx> 480:
+            self.leftx_base = 320
+        else:
+            self.leftx_base = leftx
+        if rightx<800 or rightx> 1120:
+            self.rightx_base = 960 
+        else:
+            self.rightx_base = rightx
         print("self.leftx_base = ", self.leftx_base, "self.rightx_base = ", self.rightx_base)
 
         return left_curverad, off_center

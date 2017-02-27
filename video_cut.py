@@ -9,22 +9,17 @@ import sys
 # -------------------------------------
 # Command line argument processing
 # -------------------------------------
-#if len(sys.argv) < 2:
-#    print("Missing image file.")
-#    print("python3 lane_detector.py <image_file>")
-#
-#FILE = str(sys.argv[1])
-#
-## Read in an test image
-#image = mpimg.imread(FILE)
+if len(sys.argv) < 2:
+    print("Missing image file.")
+    print("python3 lane_detector.py <image_file>")
 
+FILE = str(sys.argv[1])
 
-clip = cv2.VideoCapture("project_video.mp4")
-#clip = cv2.VideoCapture("harder_challenge_video.mp4")
+clip = cv2.VideoCapture(FILE)
 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
 
 frame_cnt = 0
-frame_start = 900
+frame_start = 500
 frame_end = 0xffffffff
 #frame_end = 50
 
@@ -40,9 +35,10 @@ while True:
             break
         print('frame_cnt = ', frame_cnt)
         if out == None:
-            out = cv2.VideoWriter('frame_gt_900.avi', fourcc, 20.0, (image.shape[1], image.shape[0]))
+            out = cv2.VideoWriter('frame_gt_500.avi', fourcc, 20.0, (image.shape[1], image.shape[0]))
 
         cv2.imshow('video', image)
+        #cv2.imwrite('c_'+str(frame_cnt)+'.png', image)
         out.write(image)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
