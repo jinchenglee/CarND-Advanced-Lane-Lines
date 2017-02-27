@@ -112,10 +112,6 @@ class lane():
                 leftx_current = np.int(np.mean(nonzerox[good_left_inds]))
             if len(good_right_inds) > minpix:        
                 rightx_current = np.int(np.mean(nonzerox[good_right_inds]))
-            # Sanity check to shrink searching range
-            if (window>3) and (win_xleft_low>600 or win_xleft_high<200 or win_xright_low<650 or win_xright_high>1000):
-                print("Window searching break.")
-                break
         
         # Concatenate the arrays of indices
         left_lane_inds = np.concatenate(left_lane_inds)

@@ -125,13 +125,4 @@ while True:
     else:
         break
 
-## File to save curvature fit data
-#record = {}
-#curvature_file = open('curvature.p','wb')
-#record["l"] = left_fit
-#record["r"] = right_fit
-#pickle.dump(record, curvature_file)
-#curvature_file.close()
-#
-
 
