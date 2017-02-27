@@ -297,12 +297,18 @@ class lane():
         cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
         # Warp the blank back to original image space using inverse perspective matrix (Minv)
         lane_shadow_on_road_img = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0]))
+        # Calculate curvature and car position
+        curverad, off_center = self.cal_curvature(binary_warped)
+        # Write onto the image
+        cv2.putText(lane_shadow_on_road_img, 'Curverad = ' + str(curverad),(50,50), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+        cv2.putText(lane_shadow_on_road_img, 'Off center = ' + str(off_center),(50,100), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+
         # Alpha blending with undistorted image.
         res = cv2.addWeighted(image, 1, lane_shadow_on_road_img, 0.3, 0)
 
         return res
 
-    def cal_curvature(self):
+    def cal_curvature(self, binary_warped):
         # Measure curvature
 
         left_fit = self.cur_l_fit
@@ -313,18 +319,28 @@ class lane():
     
         ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
         leftx= left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-        rightx= right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+        #rightx= right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
     
         y_eval = np.max(ploty) # Select the bottom line position to evaluate
         # Fit new polynomials to x,y in world space
         left_fit_cr = np.polyfit(ploty*ym_per_pix, leftx*xm_per_pix, 2)
-        right_fit_cr = np.polyfit(ploty*ym_per_pix, rightx*xm_per_pix, 2)
+        #right_fit_cr = np.polyfit(ploty*ym_per_pix, rightx*xm_per_pix, 2)
         # Calculate the new radii of curvature
         left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
-        right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
+        #right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
         # Now our radius of curvature is in meters
-        print(left_curverad, 'm', right_curverad, 'm')
+        print(left_curverad, 'm')
+        #print(left_curverad, 'm', right_curverad, 'm')
+
+        # Find car position as to center of lane
+        leftx= left_fit[0]*y_eval**2 + left_fit[1]*y_eval + left_fit[2]
+        rightx= right_fit[0]*y_eval**2 + right_fit[1]*y_eval + right_fit[2]
+
+        off_x = 640 - (leftx + rightx)//2 
+        off_center = off_x * xm_per_pix
+        print("off center = ", off_center)
+
+        return left_curverad, off_center
     
-        return left_curverad, right_curverad
 
 
