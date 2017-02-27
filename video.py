@@ -56,8 +56,8 @@ def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_t
         lane.curve_fit(binary_warped)
 
     # Sanity check on curve fit parameters
-    reset = False
-    reset = lane.fit_sanity_check()
+    detected = False
+    detected = lane.fit_sanity_check()
 
     # Draw detected lane onto the road
     res = lane_shadow_on_road_img = lane.draw_lane_area(binary_warped, img, P_inv)
@@ -66,7 +66,7 @@ def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_t
     visualize_img = lane.visualize_fit(binary_warped)
     res = cv2.addWeighted(res, 1, visualize_img, 0.5, 0)
 
-    return res, reset
+    return res, detected
 
 
 # -------------------------------------
@@ -74,7 +74,7 @@ def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_t
 # -------------------------------------
 if len(sys.argv) < 2:
     print("Missing image file.")
-    print("python3 lane_detector.py <image_file>")
+    print("python3 video.py <image_file>")
 
 FILE = str(sys.argv[1])
 
@@ -94,7 +94,7 @@ ploty = np.linspace(0, 719, 720)
 lane = lane.lane()
 
 # Search as if from start of frame
-reset = False
+detected = False
 
 while True:
     flag, image = clip.read()
@@ -109,7 +109,7 @@ while True:
             out = cv2.VideoWriter('output.avi', fourcc, 30.0, (image.shape[1], image.shape[0]))
 
         # Video pipeline
-        res,reset = pipeline(lane, image, (frame_cnt==1) or reset)
+        res, detected = pipeline(lane, image, (frame_cnt==1) or (not(detected)))
 
         # Write video out
         cv2.imshow('video', res)

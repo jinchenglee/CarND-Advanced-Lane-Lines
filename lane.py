@@ -8,26 +8,17 @@ class lane():
     """
 
     def __init__(self):
-        # was the line detected in the last iteration?
-        self.detected = False  
+        # Detection flag
+        self.detected = False
         # x values of the last n fits of the line
         self.recent_l_fit = [] 
         self.recent_r_fit = [] 
-        #average x values of the fitted line over the last n iterations
-        self.bestx = None     
         #polynomial coefficients for the most recent fit
         self.cur_l_fit = []
         self.cur_r_fit = []
-        #radius of curvature of the line in some units
-        self.radius_of_curvature = None 
-        #distance in meters of vehicle center from the line
-        self.line_base_pos = None 
-        #difference in fit coefficients between last and new fits
-        self.diffs = np.array([0,0,0], dtype='float') 
-        #x values for detected line pixels
-        self.cur_x = None  
-        #y values for detected line pixels
-        self.cur_y = None
+        # Current base point in x direction, where search starts
+        self.leftx_base = 320
+        self.rightx_base = 960 
         # Number of history records
         self.num_history = 10
         # Number of consecutive no good detection, which should trigger reset
@@ -62,9 +53,6 @@ class lane():
         '''
         # Take a histogram of the bottom half of the image
         histogram = np.sum(binary_warped[binary_warped.shape[0]//2:,:], axis=0)
-        # Histogram analysis
-        #plt.plot(histogram)
-        #plt.show()
         
         if visualize:
             # Create an output image to draw on and  visualize the result
@@ -75,8 +63,14 @@ class lane():
         # Find the peak of the left and right halves of the histogram
         # These will be the starting point for the left and right lines
         midpoint = np.int(histogram.shape[0]/2)
-        leftx_base = np.argmax(histogram[:midpoint])
-        rightx_base = np.argmax(histogram[midpoint:]) + midpoint
+        # Search within a certain window
+        if not(self.detected): # First time or track lost
+            self.leftx_base = np.argmax(histogram[:midpoint])
+            self.rightx_base = np.argmax(histogram[midpoint:]) + midpoint
+        else: # Search around last base point
+            self.leftx_base = np.argmax(histogram[self.leftx_base-100:self.leftx_base+100])
+            self.rightx_base = np.argmax(histogram[self.rightx_base-100:self.rightx_base+100]) + midpoint
+        print("self.leftx_base = ", self.leftx_base, "self.rightx_base = ", self.rightx_base)
         
         # Choose the number of sliding windows
         nwindows = 9
@@ -87,8 +81,8 @@ class lane():
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
         # Current positions to be updated for each window
-        leftx_current = leftx_base
-        rightx_current = rightx_base
+        leftx_current = self.leftx_base
+        rightx_current = self.rightx_base
         # Set the width of the windows +/- margin
         margin = 80
         # Set minimum number of pixels found to recenter window
@@ -138,6 +132,9 @@ class lane():
         self.cur_l_fit = left_fit 
         self.cur_r_fit = right_fit
         
+        # Set flag
+        self.detected = True
+
         ## Visualization
         if visualize:
             # Generate x and y values for plotting
@@ -174,6 +171,9 @@ class lane():
         right_fit = np.polyfit(righty, rightx, 2)
         self.cur_l_fit = left_fit 
         self.cur_r_fit = right_fit
+
+        # Set flag
+        self.detected = True
         
     def visualize_fit(self, binary_warped):
         """
@@ -223,8 +223,6 @@ class lane():
         If yes to all above, update best records. 
         If no to any of above, keep using best records. 
         """
-        reset = False
-
         l_fit = self.cur_l_fit
         r_fit = self.cur_r_fit
 
@@ -245,7 +243,7 @@ class lane():
                 self.l_cnt += 1
                 if self.l_cnt > self.num_no_update:
                     print("l reset.")
-                    reset = True
+                    self.detected = False 
                     self.recent_l_fit = []
                     self.l_cnt = 0
 
@@ -265,7 +263,7 @@ class lane():
                 self.r_cnt += 1
                 if self.r_cnt > self.num_no_update:
                     print("r reset.")
-                    reset = True
+                    self.detected = False 
                     self.recent_r_fit = []
                     self.r_cnt = 0
 
@@ -273,7 +271,7 @@ class lane():
         self.cur_l_fit = l_fit
         self.cur_r_fit = r_fit
 
-        return reset
+        return self.detected
  
     def draw_lane_area(self, binary_warped, image, P_inv):
         """
@@ -300,8 +298,8 @@ class lane():
         # Calculate curvature and car position
         curverad, off_center = self.cal_curvature(binary_warped)
         # Write onto the image
-        cv2.putText(lane_shadow_on_road_img, 'Curverad = ' + str(curverad),(50,50), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
-        cv2.putText(lane_shadow_on_road_img, 'Off center = ' + str(off_center),(50,100), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+        cv2.putText(lane_shadow_on_road_img, 'Curverad = '+str(curverad)+'m', (50,50), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+        cv2.putText(lane_shadow_on_road_img, 'Off center = '+str(off_center)+'m (negative means left)', (50,100), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
 
         # Alpha blending with undistorted image.
         res = cv2.addWeighted(image, 1, lane_shadow_on_road_img, 0.3, 0)
@@ -319,18 +317,14 @@ class lane():
     
         ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
         leftx= left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-        #rightx= right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
-    
+
         y_eval = np.max(ploty) # Select the bottom line position to evaluate
         # Fit new polynomials to x,y in world space
         left_fit_cr = np.polyfit(ploty*ym_per_pix, leftx*xm_per_pix, 2)
-        #right_fit_cr = np.polyfit(ploty*ym_per_pix, rightx*xm_per_pix, 2)
         # Calculate the new radii of curvature
         left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
-        #right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
         # Now our radius of curvature is in meters
-        print(left_curverad, 'm')
-        #print(left_curverad, 'm', right_curverad, 'm')
+        #print(left_curverad, 'm')
 
         # Find car position as to center of lane
         leftx= left_fit[0]*y_eval**2 + left_fit[1]*y_eval + left_fit[2]
@@ -338,7 +332,12 @@ class lane():
 
         off_x = 640 - (leftx + rightx)//2 
         off_center = off_x * xm_per_pix
-        print("off center = ", off_center)
+        #print("off center = ", off_center)
+
+        # Update left/right x base
+        self.leftx_base = leftx
+        self.rightx_base = rightx
+        print("self.leftx_base = ", self.leftx_base, "self.rightx_base = ", self.rightx_base)
 
         return left_curverad, off_center
     
