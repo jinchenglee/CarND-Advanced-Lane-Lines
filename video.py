@@ -5,6 +5,7 @@ import matplotlib.image as mpimg
 import pickle
 import glob
 import sys
+import img_filter 
 
 
 # Lane detection pipeline
@@ -18,43 +19,24 @@ def pipeline(img, s_thresh=(170, 255), sx_thresh=(50, 150), sobel_ksize=5):
     '''
 
     img = np.copy(img)
+    ft = img_filter.img_filter()
     # Convert to HSV color space and separate the V channel
-    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
-    
-    # AOI (area of interest) mask - we only care about lower part of the image
-    size_x, size_y, size_ch = hls.shape
-    hls[0:size_x//2,:,:] = 0
-    l_channel = hls[:,:,1]
-    s_channel = hls[:,:,2]
-
+    hls = ft.conv_hls_halfmask(img)
     # Luma threshold
-    l_binary = np.zeros_like(l_channel)
-    l_binary[l_channel>30]=1
+    luma_binary = np.zeros_like(hls[:,:,1])
+    luma_binary = ft.filter_luma(hls[:,:,1])
 
     # Sobel x on L channel
-    sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0, ksize=sobel_ksize) # Take the derivative in x
-    abs_sobelx = np.absolute(sobelx) # Absolute x derivative to accentuate lines away from horizontal
-    scaled_sobel = np.uint8(255*abs_sobelx/np.max(abs_sobelx))
-
-    # Threshold x gradient
-    sxbinary = np.zeros_like(scaled_sobel)
-    sxbinary[(scaled_sobel >= sx_thresh[0]) & (scaled_sobel <= sx_thresh[1])] = 1
+    grad_binary = np.zeros_like(luma_binary)
+    grad_binary = ft.filter_gradient_threshold(hls[:,:,1])
 
     # Threshold Saturation color channel
-    s_binary = np.zeros_like(s_channel)
-    scaled_s_ch = np.uint8(255*s_channel/np.max(s_channel))
-    s_binary[(scaled_s_ch >= s_thresh[0]) & (scaled_s_ch <= s_thresh[1])] = 1
-    
-    # Gradients direction 
-    #dir_binary = dir_threshold(img, sobel_kernel=sobel_ksize, thresh=(np.pi/7, np.pi/3))
+    sat_binary = np.zeros_like(luma_binary)
+    sat_binary = ft.filter_sat(hls[:,:,2])
 
-    # Stack each channel
-    #color_binary = np.dstack((dir_binary, sxbinary, s_binary))
-    #color_binary = np.dstack((np.zeros_like(dir_binary), np.zeros_like(sxbinary), s_binary))
-
-    binary = np.zeros_like(s_channel)
-    #binary[(sxbinary==1) | (s_binary==1)] = 1
-    binary[((sxbinary==1) | (s_binary==1)) & (l_binary==1)] = 1
+    # Combine filter binaries
+    binary = np.zeros_like(luma_binary)
+    binary = ft.filter_fusion(luma_binary, sat_binary, grad_binary)
     return binary
 
 def curve_fit_1st(binary_warped):
@@ -272,8 +254,9 @@ warp_f.close()
 P_inv = np.linalg.inv(P)
 
 
-clip = cv2.VideoCapture("project_video.mp4")
+#clip = cv2.VideoCapture("project_video.mp4")
 #clip = cv2.VideoCapture("frame_gt_900.avi")
+clip = cv2.VideoCapture("frame_gt_500.avi")
 #clip = cv2.VideoCapture("challenge_video.mp4")
 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
 
