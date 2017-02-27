@@ -50,41 +50,35 @@ def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_t
 
     # Curve fit for the 1st frame
     if fresh_start:
-        visualize_img = lane.curve_fit_1st(binary_warped)
-        #print("left_fit = ", left_fit)
-        #print("right_fit = ", right_fit)
+        _ = lane.curve_fit_1st(binary_warped)
     else:
         # Simulate the case to feed a "second" frame using curve_fit()
-        visualize_img = lane.curve_fit(binary_warped)
-        #print("left_fit = ", left_fit)
-        #print("right_fit = ", right_fit)
+        lane.curve_fit(binary_warped)
+
+    # Sanity check on curve fit parameters
+    reset = False
+    reset = lane.fit_sanity_check()
 
     # Draw detected lane onto the road
     res = lane_shadow_on_road_img = lane.draw_lane_area(binary_warped, img, P_inv)
 
     # Optional: blending with visualization image
+    visualize_img = lane.visualize_fit(binary_warped)
     res = cv2.addWeighted(res, 1, visualize_img, 0.5, 0)
 
-    return res
+    return res, reset
 
 
 # -------------------------------------
 # Command line argument processing
 # -------------------------------------
-#if len(sys.argv) < 2:
-#    print("Missing image file.")
-#    print("python3 lane_detector.py <image_file>")
-#
-#FILE = str(sys.argv[1])
-#
-## Read in an test image
-#image = mpimg.imread(FILE)
+if len(sys.argv) < 2:
+    print("Missing image file.")
+    print("python3 lane_detector.py <image_file>")
 
+FILE = str(sys.argv[1])
 
-#clip = cv2.VideoCapture("project_video.mp4")
-#clip = cv2.VideoCapture("frame_gt_900.avi")
-clip = cv2.VideoCapture("frame_gt_500.avi")
-#clip = cv2.VideoCapture("challenge_video.mp4")
+clip = cv2.VideoCapture(FILE)
 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
 
 frame_cnt = 0
@@ -93,19 +87,14 @@ frame_end = 0xffffffff
 #frame_end = 50
 
 out=None
-l_fit = 0
-r_fit = 0
-
-l_cnt = 0
-r_cnt = 0
-
-left_fit = []
-right_fit = []
 
 # Generate x and y values for plotting
 ploty = np.linspace(0, 719, 720)
 
 lane = lane.lane()
+
+# Search as if from start of frame
+reset = False
 
 while True:
     flag, image = clip.read()
@@ -120,53 +109,10 @@ while True:
             out = cv2.VideoWriter('output.avi', fourcc, 30.0, (image.shape[1], image.shape[0]))
 
         # Video pipeline
-        res = pipeline(lane, image, frame_cnt==1)
-        #print("raw l_fit = ", l_fit, "raw r_fit = ", r_fit)
-
-        ## Evaluate whether the new curvature values make sense.
-        #NUM_HISTORY = 3
-        #NUM_NOUPDATE = 6
-        #if len(left_fit)<NUM_HISTORY:
-        #    left_fit.append(l_fit)
-        #else:
-        #    l_avg = np.mean(np.array(left_fit), axis=0)
-        #    l_std = np.std(np.array(left_fit), axis=0)
-        #    l = np.abs((l_fit - l_avg)/l_avg) < 0.5
-        #    if l.all():
-        #        print("l updated.")
-        #        left_fit.pop(0)
-        #        left_fit.append(l_fit)
-        #        l_cnt = 0
-        #    else:
-        #        l_fit = l_avg
-        #        l_cnt += 1
-        #        if l_cnt > NUM_NOUPDATE:
-        #            print("l reset.")
-        #            left_fit = []
-        #            l_cnt = 0
-
-        #if len(right_fit)<NUM_HISTORY:
-        #    right_fit.append(r_fit)
-        #else:
-        #    r_avg = np.mean(np.array(right_fit), axis=0)
-        #    r_std = np.std(np.array(right_fit), axis=0)
-        #    r = np.abs((r_fit - r_avg)/r_avg) < 0.5
-        #    if r.all():
-        #        print("r updated.")
-        #        right_fit.pop(0)
-        #        right_fit.append(r_fit)
-        #        r_cnt = 0
-        #    else:
-        #        r_fit = r_avg
-        #        r_cnt += 1
-        #        if r_cnt > NUM_NOUPDATE:
-        #            print("r reset.")
-        #            right_fit = []
-        #            r_cnt = 0
+        res,reset = pipeline(lane, image, (frame_cnt==1) or reset)
 
         # Write video out
         cv2.imshow('video', res)
-        #print("l_fit = ", l_fit, "r_fit = ", r_fit)
         out.write(res)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):

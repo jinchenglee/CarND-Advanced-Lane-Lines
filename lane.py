@@ -11,13 +11,13 @@ class lane():
         # was the line detected in the last iteration?
         self.detected = False  
         # x values of the last n fits of the line
-        self.recent_xfitted = [] 
+        self.recent_l_fit = [] 
+        self.recent_r_fit = [] 
         #average x values of the fitted line over the last n iterations
         self.bestx = None     
-        #polynomial coefficients averaged over the last n iterations
-        self.best_fit = None  
         #polynomial coefficients for the most recent fit
-        self.current_fit = [np.array([False])]  
+        self.cur_l_fit = []
+        self.cur_r_fit = []
         #radius of curvature of the line in some units
         self.radius_of_curvature = None 
         #distance in meters of vehicle center from the line
@@ -25,9 +25,18 @@ class lane():
         #difference in fit coefficients between last and new fits
         self.diffs = np.array([0,0,0], dtype='float') 
         #x values for detected line pixels
-        self.allx = None  
+        self.cur_x = None  
         #y values for detected line pixels
-        self.ally = None
+        self.cur_y = None
+        # Number of history records
+        self.num_history = 10
+        # Number of consecutive no good detection, which should trigger reset
+        self.num_no_update = 5
+        # Max allowed percetage of deviation from avg in a single detection
+        self.max_deviation_percentage = 0.5
+        # No update counters
+        self.l_cnt = 0
+        self.r_cnt = 0
 
     def get_param(self):
         # Camera parameters
@@ -126,7 +135,8 @@ class lane():
         # Fit a second order polynomial to each
         left_fit = np.polyfit(lefty, leftx, 2)
         right_fit = np.polyfit(righty, rightx, 2)
-        self.current_fit = [left_fit, right_fit]
+        self.cur_l_fit = left_fit 
+        self.cur_r_fit = right_fit
         
         ## Visualization
         if visualize:
@@ -134,7 +144,7 @@ class lane():
             ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
             left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
             right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
-            
+
             out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
             out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
 
@@ -144,8 +154,8 @@ class lane():
         '''
         Curve fit since 2nd frame
         '''
-        left_fit = self.current_fit[0]
-        right_fit = self.current_fit[1]
+        left_fit = self.cur_l_fit
+        right_fit = self.cur_r_fit
 
         nonzero = binary_warped.nonzero()
         nonzeroy = np.array(nonzero[0])
@@ -162,42 +172,141 @@ class lane():
         # Fit a second order polynomial to each
         left_fit = np.polyfit(lefty, leftx, 2)
         right_fit = np.polyfit(righty, rightx, 2)
-        self.current_fit = [left_fit, right_fit]
+        self.cur_l_fit = left_fit 
+        self.cur_r_fit = right_fit
         
-        if visualize:
-            #Visualize
-            # Generate x and y values for plotting
-            ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
-            left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-            right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
-            # Create an image to draw on and an image to show the selection window
-            out_img = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
-            window_img = np.zeros_like(out_img)
-            # Color in left and right line pixels
-            out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-            out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-            # Generate a polygon to illustrate the search window area
-            # And recast the x and y points into usable format for cv2.fillPoly()
-            left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
-            left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, ploty])))])
-            left_line_pts = np.hstack((left_line_window1, left_line_window2))
-            right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
-            right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, ploty])))])
-            right_line_pts = np.hstack((right_line_window1, right_line_window2))
-            # Draw the lane onto the warped blank image
-            cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
-            cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
-            out_img = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-        else:
-            out_img = []
+    def visualize_fit(self, binary_warped):
+        """
+        Visualize the birds-eye viewpoint fit condition.
+        """
+        left_fit = self.cur_l_fit
+        right_fit = self.cur_r_fit
+
+        nonzero = binary_warped.nonzero()
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        margin = 80
+        left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + left_fit[2] + margin))) 
+        right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + right_fit[2] + margin)))  
+ 
+        #Visualize
+        # Generate x and y values for plotting
+        ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+        left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+        right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+
+        # Create an image to draw on and an image to show the selection window
+        out_img = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
+        window_img = np.zeros_like(out_img)
+        # Color in left and right line pixels
+        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        # Generate a polygon to illustrate the search window area
+        # And recast the x and y points into usable format for cv2.fillPoly()
+        left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
+        left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, ploty])))])
+        left_line_pts = np.hstack((left_line_window1, left_line_window2))
+        right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
+        right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, ploty])))])
+        right_line_pts = np.hstack((right_line_window1, right_line_window2))
+        # Draw the lane onto the warped blank image
+        cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
+        cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
+        out_img = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
 
         return out_img
    
+    def fit_sanity_check(self):
+        """
+        - Current detected within n% of best average of past.
+        - TODO: Distance between left/right lane lines.
+        If yes to all above, update best records. 
+        If no to any of above, keep using best records. 
+        """
+        reset = False
+
+        l_fit = self.cur_l_fit
+        r_fit = self.cur_r_fit
+
+        # Start of detection, fill history
+        if len(self.recent_l_fit)<self.num_history:
+            self.recent_l_fit.append(self.cur_l_fit)
+        else:
+            l_avg = np.mean(np.array(self.recent_l_fit), axis=0)
+            l_delta = np.abs((l_fit - l_avg)/l_avg) < self.max_deviation_percentage
+            if l_delta.all():
+                print("l updated.")
+                self.recent_l_fit.pop(0)
+                self.recent_l_fit.append(self.cur_l_fit)
+                self.l_cnt = 0
+            else:
+                print("l uses avg.")
+                l_fit = l_avg
+                self.l_cnt += 1
+                if self.l_cnt > self.num_no_update:
+                    print("l reset.")
+                    reset = True
+                    self.recent_l_fit = []
+                    self.l_cnt = 0
+
+        if len(self.recent_r_fit)<self.num_history:
+            self.recent_r_fit.append(self.cur_r_fit)
+        else:
+            r_avg = np.mean(np.array(self.recent_r_fit), axis=0)
+            r_delta = np.abs((r_fit - r_avg)/r_avg) < self.max_deviation_percentage
+            if r_delta.all():
+                print("r updated.")
+                self.recent_r_fit.pop(0)
+                self.recent_r_fit.append(self.cur_r_fit)
+                self.r_cnt = 0
+            else:
+                print("r uses avg.")
+                r_fit = r_avg
+                self.r_cnt += 1
+                if self.r_cnt > self.num_no_update:
+                    print("r reset.")
+                    reset = True
+                    self.recent_r_fit = []
+                    self.r_cnt = 0
+
+        # Update to use corrected l/r_fit
+        self.cur_l_fit = l_fit
+        self.cur_r_fit = r_fit
+
+        return reset
+ 
+    def draw_lane_area(self, binary_warped, image, P_inv):
+        """
+        Draw the detected lane area on the road surface.
+        - binary_warped is the birds-eye view binary image.
+        - image is the original image for alpha-blending.
+        """
+        # Convert back to map to road
+        l_fit = self.cur_l_fit
+        r_fit = self.cur_r_fit
+        ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+        left_fitx = l_fit[0]*ploty**2 + l_fit[1]*ploty + l_fit[2]
+        right_fitx = r_fit[0]*ploty**2 + r_fit[1]*ploty + r_fit[2]
+        # Create an image to draw the lines on
+        color_warp = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
+        # Recast the x and y points into usable format for cv2.fillPoly()
+        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+        pts = np.hstack((pts_left, pts_right))
+        # Draw the lane onto the warped blank image
+        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+        # Warp the blank back to original image space using inverse perspective matrix (Minv)
+        lane_shadow_on_road_img = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0]))
+        # Alpha blending with undistorted image.
+        res = cv2.addWeighted(image, 1, lane_shadow_on_road_img, 0.3, 0)
+
+        return res
+
     def cal_curvature(self):
         # Measure curvature
 
-        left_fit = self.current_fit[0]
-        right_fit = self.current_fit[1]
+        left_fit = self.cur_l_fit
+        right_fit = self.cur_r_fit
 
         ym_per_pix = 30/720 # Assuming 30 meters per pixel in y dimenstion
         xm_per_pix = 3.7/700 # 3.7 meters per pixel in x dimenstion
@@ -217,33 +326,5 @@ class lane():
         print(left_curverad, 'm', right_curverad, 'm')
     
         return left_curverad, right_curverad
-
-
-    def draw_lane_area(self, binary_warped, image, P_inv):
-        """
-        Draw the detected lane area on the road surface.
-        - binary_warped is the birds-eye view binary image.
-        - image is the original image for alpha-blending.
-        """
-        # Convert back to map to road
-        l_fit = self.current_fit[0]
-        r_fit = self.current_fit[1]
-        ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
-        left_fitx = l_fit[0]*ploty**2 + l_fit[1]*ploty + l_fit[2]
-        right_fitx = r_fit[0]*ploty**2 + r_fit[1]*ploty + r_fit[2]
-        # Create an image to draw the lines on
-        color_warp = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
-        # Recast the x and y points into usable format for cv2.fillPoly()
-        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
-        pts = np.hstack((pts_left, pts_right))
-        # Draw the lane onto the warped blank image
-        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
-        # Warp the blank back to original image space using inverse perspective matrix (Minv)
-        lane_shadow_on_road_img = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0]))
-        # Alpha blending with undistorted image.
-        res = cv2.addWeighted(image, 1, lane_shadow_on_road_img, 0.3, 0)
-
-        return res
 
 
