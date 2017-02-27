@@ -50,16 +50,22 @@ def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_t
 
     # Curve fit for the 1st frame
     if fresh_start:
-        curve_fit_img = lane.curve_fit_1st(binary_warped)
+        visualize_img = lane.curve_fit_1st(binary_warped)
         #print("left_fit = ", left_fit)
         #print("right_fit = ", right_fit)
     else:
         # Simulate the case to feed a "second" frame using curve_fit()
-        curve_fit_img = lane.curve_fit(binary_warped)
+        visualize_img = lane.curve_fit(binary_warped)
         #print("left_fit = ", left_fit)
         #print("right_fit = ", right_fit)
 
-    return curve_fit_img
+    # Draw detected lane onto the road
+    res = lane_shadow_on_road_img = lane.draw_lane_area(binary_warped, img, P_inv)
+
+    # Optional: blending with visualization image
+    res = cv2.addWeighted(res, 1, visualize_img, 0.5, 0)
+
+    return res
 
 
 # -------------------------------------
@@ -114,7 +120,7 @@ while True:
             out = cv2.VideoWriter('output.avi', fourcc, 30.0, (image.shape[1], image.shape[0]))
 
         # Video pipeline
-        visualize_img = pipeline(lane, image, frame_cnt==1)
+        res = pipeline(lane, image, frame_cnt==1)
         #print("raw l_fit = ", l_fit, "raw r_fit = ", r_fit)
 
         ## Evaluate whether the new curvature values make sense.
@@ -157,63 +163,6 @@ while True:
         #            print("r reset.")
         #            right_fit = []
         #            r_cnt = 0
-
-        ## Bird's eye binary
-        #color_binary = np.dstack((binary_warped, binary_warped, binary_warped))
-        #res = np.array(color_binary*255, dtype='uint8')
-
-        ##Visualize
-        #margin = 80
-        #nonzero = binary_warped.nonzero()
-        #nonzeroy = np.array(nonzero[0])
-        #nonzerox = np.array(nonzero[1])
-        #left_lane_inds = ((nonzerox > (l_fit[0]*(nonzeroy**2) + l_fit[1]*nonzeroy + l_fit[2] - margin)) & (nonzerox < (l_fit[0]*(nonzeroy**2) + l_fit[1]*nonzeroy + l_fit[2] + margin))) 
-        #right_lane_inds = ((nonzerox > (r_fit[0]*(nonzeroy**2) + r_fit[1]*nonzeroy + r_fit[2] - margin)) & (nonzerox < (r_fit[0]*(nonzeroy**2) + r_fit[1]*nonzeroy + r_fit[2] + margin)))  
-        ## Generate x and y values for plotting
-        #ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
-        #l_fitx = l_fit[0]*ploty**2 + l_fit[1]*ploty + l_fit[2]
-        #r_fitx = r_fit[0]*ploty**2 + r_fit[1]*ploty + r_fit[2]
-        ## Create an image to draw on and an image to show the selection window
-        #out_img = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
-        #window_img = np.zeros_like(out_img)
-        ## Color in left and right line pixels
-        #out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-        #out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-        ## Generate a polygon to illustrate the search window area
-        ## And recast the x and y points into usable format for cv2.fillPoly()
-        #left_line_window1 = np.array([np.transpose(np.vstack([l_fitx-margin, ploty]))])
-        #left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([l_fitx+margin, ploty])))])
-        #left_line_pts = np.hstack((left_line_window1, left_line_window2))
-        #right_line_window1 = np.array([np.transpose(np.vstack([r_fitx-margin, ploty]))])
-        #right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([r_fitx+margin, ploty])))])
-        #right_line_pts = np.hstack((right_line_window1, right_line_window2))
-        ## Draw the lane onto the warped blank image
-        #cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
-        #cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
-        #res1 = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-
-        K,d,P,P_inv = lane.get_param()
-
-        # Convert back to map to road
-        l_fit = lane.current_fit[0]
-        r_fit = lane.current_fit[1]
-        left_fitx = l_fit[0]*ploty**2 + l_fit[1]*ploty + l_fit[2]
-        right_fitx = r_fit[0]*ploty**2 + r_fit[1]*ploty + r_fit[2]
-        # Create an image to draw the lines on
-        color_warp = np.zeros_like(visualize_img).astype(np.uint8)
-        # Recast the x and y points into usable format for cv2.fillPoly()
-        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
-        pts = np.hstack((pts_left, pts_right))
-        # Draw the lane onto the warped blank image
-        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
-        # Warp the blank back to original image space using inverse perspective matrix (Minv)
-        newwarp = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0]))
-        # Combine the result with the original image
-        # TODO: Need to alpha blending with undistorted image.
-        res = cv2.addWeighted(image, 1, newwarp, 0.3, 0)
-
-        res = cv2.addWeighted(visualize_img, 1, res, 0.5, 0)
 
         # Write video out
         cv2.imshow('video', res)

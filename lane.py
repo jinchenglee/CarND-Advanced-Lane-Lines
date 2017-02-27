@@ -162,6 +162,7 @@ class lane():
         # Fit a second order polynomial to each
         left_fit = np.polyfit(lefty, leftx, 2)
         right_fit = np.polyfit(righty, rightx, 2)
+        self.current_fit = [left_fit, right_fit]
         
         if visualize:
             #Visualize
@@ -201,7 +202,7 @@ class lane():
         ym_per_pix = 30/720 # Assuming 30 meters per pixel in y dimenstion
         xm_per_pix = 3.7/700 # 3.7 meters per pixel in x dimenstion
     
-        ploty = np.linspace(0,719, num=720)
+        ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
         leftx= left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
         rightx= right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
     
@@ -216,5 +217,33 @@ class lane():
         print(left_curverad, 'm', right_curverad, 'm')
     
         return left_curverad, right_curverad
+
+
+    def draw_lane_area(self, binary_warped, image, P_inv):
+        """
+        Draw the detected lane area on the road surface.
+        - binary_warped is the birds-eye view binary image.
+        - image is the original image for alpha-blending.
+        """
+        # Convert back to map to road
+        l_fit = self.current_fit[0]
+        r_fit = self.current_fit[1]
+        ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+        left_fitx = l_fit[0]*ploty**2 + l_fit[1]*ploty + l_fit[2]
+        right_fitx = r_fit[0]*ploty**2 + r_fit[1]*ploty + r_fit[2]
+        # Create an image to draw the lines on
+        color_warp = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
+        # Recast the x and y points into usable format for cv2.fillPoly()
+        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+        pts = np.hstack((pts_left, pts_right))
+        # Draw the lane onto the warped blank image
+        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+        # Warp the blank back to original image space using inverse perspective matrix (Minv)
+        lane_shadow_on_road_img = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0]))
+        # Alpha blending with undistorted image.
+        res = cv2.addWeighted(image, 1, lane_shadow_on_road_img, 0.3, 0)
+
+        return res
 
 
