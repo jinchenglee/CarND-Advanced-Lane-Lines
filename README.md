@@ -25,7 +25,8 @@ As part of Udacity Autonomous Driving Nano-Degree, the goals / steps of this pro
 [image5]: ./examples/color_fit_lines.jpg "Fit Visual"
 [image5a]: ./test_images/test1_curve_fit_window_search.png "Searching windows"
 [image5b]: ./examples/histogram_lane_pixels.png "Lane pixels histogram"
-[image6]: ./examples/example_output.jpg "Output"
+[image6a]: ./test_images/curverad_2.png "Straight lane"
+[image6b]: ./test_images/curverad_3.png "Cuve lane and car sits left"
 [image7]: ./camera_cal/added_rgb_axis.jpg
 [video1]: ./project_video.mp4 "Video"
 
@@ -219,13 +220,55 @@ The `left_fit/right_fit` values (shape=[1,3]) are updated for each input frame i
 
 ####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+The detected lane is fit to a 2nd order polynomial curve $$f(y)=Ay^2+By+C$$.
+
+As a result, the radius of curvature is calculated using:
+
+$$R_{curve} = {(1+(2Ay+B)^2)^{3/2} \over |2A|}$$
+
+As to the car position, it is calculated using 640 minus midpoint of bottom-most left lane and right lane position in pixel values, then scale it to meters. This works under the assumption that the camera is mounted right at the middle of the car. When the car is right at the middle of the lane, the average of left/right lane position in pixel should be half of image width, 640. 
+
+I did these in function cal_curvature in my code in `lane.py`:
+
+```python
+    def cal_curvature(self, binary_warped):
+        # Measure curvature
+
+        left_fit = self.cur_l_fit
+        right_fit = self.cur_r_fit
+
+        ym_per_pix = 30/720 # Assuming 30 meters per pixel in y dimenstion
+        xm_per_pix = 3.7/700 # 3.7 meters per pixel in x dimenstion
+
+        ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+        leftx= left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+
+        y_eval = np.max(ploty) # Select the bottom line position to evaluate
+        # Fit new polynomials to x,y in world space
+        left_fit_cr = np.polyfit(ploty*ym_per_pix, leftx*xm_per_pix, 2)
+        # Calculate the new radii of curvature
+        left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
+        # Now our radius of curvature is in meters
+        #print(left_curverad, 'm')
+
+        # Find car position as to center of lane
+        leftx= left_fit[0]*y_eval**2 + left_fit[1]*y_eval + left_fit[2]
+        rightx= right_fit[0]*y_eval**2 + right_fit[1]*y_eval + right_fit[2]
+	
+	# Assuming camera is mounted at center of the car.
+	# Negative means in left part of the lane.
+        off_x = 640 - (leftx + rightx)//2
+        off_center = off_x * xm_per_pix
+
+```
+
 
 ####6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+I implemented this step in function draw_lane_area() in my code in `lane.py`.  Here is a few examples of my result on a test image:
 
-![alt text][image6]
+![alt text][image6a]
+![alt text][image6b]
 
 ---
 
@@ -233,7 +276,7 @@ I implemented this step in lines # through # in my code in `yet_another_file.py`
 
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./project_video_output.avi)
 
 ---
 
@@ -241,5 +284,8 @@ Here's a [link to my video result](./project_video.mp4)
 
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+Current implementation failed with both challenge videos. These are the challenges:
+1. Several vertical edges sit close to each other (such as in challenge_video.mp4), which easily confuses the searching window. This has to be resolved using better binary filter technique, probably adaptive ones. 
+2. Brightness and light reflection sensitive. In harder_challenge_video.mp4, there are cases input video image suddenly becomes much brighter that filtering binary, with fixed threshold, cannot differentiate features. Again, adaptive filtering threshold and/or input image histogram equalization should both help.
+
 

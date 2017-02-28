@@ -84,7 +84,7 @@ if len(sys.argv)>2:
     VISUAL_ON = True
 
 clip = cv2.VideoCapture(FILE)
-fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+fourcc = cv2.VideoWriter_fourcc(*'X264')
 
 frame_cnt = 0
 frame_start = 0
