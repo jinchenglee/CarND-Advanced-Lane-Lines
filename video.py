@@ -40,9 +40,12 @@ def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_t
     sat_binary = np.zeros_like(luma_binary)
     sat_binary = img_filter.filter_sat(img_sat_ch=hls[:,:,2], threshold=sat_th)
 
+    # Mentor feedback method
+    mentor_binary = img_filter.filter_mentor_advise(img) 
+
     # Combine filter binaries
     binary = np.zeros_like(luma_binary)
-    binary = img_filter.filter_fusion(luma_binary, sat_binary, grad_binary)
+    binary = img_filter.filter_fusion(luma_binary, sat_binary, grad_binary, mentor_binary)
 
     # Perspective transform
     img_size = (binary.shape[1], binary.shape[0])

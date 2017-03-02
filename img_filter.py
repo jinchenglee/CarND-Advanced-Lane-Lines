@@ -67,11 +67,33 @@ def filter_gradient_threshold(image, direction="x", threshold=(50,150),ksize=3):
     sobel_binary[(scaled_sobel >= threshold[0]) & (scaled_sobel <= threshold[1])] = 1
     return sobel_binary
 
-def filter_fusion(luma_bin, sat_bin, grad_bin):
+def filter_mentor_advise(image):
+    """
+    Implement what Udacity mentor feedback.
+    """
+    HSV = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+
+    # For yellow
+    yellow = cv2.inRange(HSV, (20, 100, 100), (50, 255, 255))
+
+    # For white
+    sensitivity_1 = 68
+    white = cv2.inRange(HSV, (0,0,255-sensitivity_1), (255,20,255))
+
+    sensitivity_2 = 60
+    HSL = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+    white_2 = cv2.inRange(HSL, (0,255-sensitivity_2,0), (255,255,sensitivity_2))
+    white_3 = cv2.inRange(image, (200,200,200), (255,255,255))
+
+    bit_layer = yellow | white | white_2 | white_3
+
+    return bit_layer
+
+def filter_fusion(luma_bin, sat_bin, grad_bin, mentor_bin):
     """
     Fuse binary filters result.
     """
     binary = np.zeros_like(luma_bin)
-    binary[((grad_bin==1) | (sat_bin==1)) & (luma_bin==1)] = 1
+    binary[ (((grad_bin==1) | (sat_bin==1)) & (luma_bin==1)) | (mentor_bin==1) ] = 1
     return binary
 

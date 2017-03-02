@@ -30,6 +30,8 @@ class lane():
         self.r_cnt = 0
         # Search window margin
         self.margin = 100
+        # Previous lane area points
+        self.lane_pts = None
 
     def get_param(self):
         # Camera parameters
@@ -267,6 +269,28 @@ class lane():
         self.cur_r_fit = r_fit
         return self.detected
  
+    def match_points(self, pts):
+        """
+        Check whether current points largely match previous one.
+        If not (above threshold), use previous saved points.
+        """
+        if (self.lane_pts == None):
+            self.lane_pts = pts
+
+        a = self.lane_pts[0]
+        b = pts[0]
+        ret = cv2.matchShapes(a,b,1,0.0)
+
+        if (ret < 0.1):
+        # Use the new polygon points to write the next frame due to similarites of last sucessfully written polygon area
+            self.lane_pts = pts
+        else:
+        # Use the old polygon points to write the next frame due to irregularities
+        # Then write the out the old polygon points
+        # This will help only use your good detections
+            pts = self.lane_pts
+        return pts
+
     def draw_lane_area(self, binary_warped, image, P_inv):
         """
         Draw the detected lane area on the road surface.
@@ -280,13 +304,15 @@ class lane():
         left_fitx = l_fit[0]*ploty**2 + l_fit[1]*ploty + l_fit[2]
         right_fitx = r_fit[0]*ploty**2 + r_fit[1]*ploty + r_fit[2]
         # Create an image to draw the lines on
-        color_warp = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*255, dtype='uint8')
+        color_warp = np.array(np.dstack((binary_warped, binary_warped, binary_warped))*0, dtype='uint8')
         # Recast the x and y points into usable format for cv2.fillPoly()
         pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
         pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
         pts = np.hstack((pts_left, pts_right))
+        # 2nd sanity check on shape
+        pts = self.match_points(pts)
         # Draw the lane onto the warped blank image
-        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+        cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
         # Warp the blank back to original image space using inverse perspective matrix (Minv)
         lane_shadow_on_road_img = cv2.warpPerspective(color_warp, P_inv, (image.shape[1], image.shape[0]))
         # Calculate curvature and car position
