@@ -63,14 +63,16 @@ def pipeline(lane, img, fresh_start=False, luma_th=30, sat_th=(170, 255), grad_t
     detected = lane.fit_sanity_check()
 
     # Draw detected lane onto the road
-    res = lane_shadow_on_road_img = lane.draw_lane_area(binary_warped, img, P_inv)
+    res = lane.draw_lane_area(binary_warped, img, P_inv)
+
+    # Return the binary image
+    visualize_img = lane.visualize_fit(binary_warped)
 
     # Optional: blending with visualization image
     if visual_on:
-        visualize_img = lane.visualize_fit(binary_warped)
         res = cv2.addWeighted(res, 1, visualize_img, 0.5, 0)
 
-    return res, detected
+    return res, visualize_img, detected
 
 
 # -------------------------------------
@@ -114,14 +116,18 @@ while True:
             break
         print('frame_cnt = ', frame_cnt)
         if out == None:
-            out = cv2.VideoWriter('output.avi', fourcc, 30.0, (image.shape[1], image.shape[0]))
+            out = cv2.VideoWriter('output.avi', fourcc, 30.0, (image.shape[1], image.shape[0]//2))
 
         # Video pipeline
-        res, detected = pipeline(lane, image, (frame_cnt==1) or (not(detected)), visual_on=VISUAL_ON)
+        res, vis_img, detected = pipeline(lane, image, (frame_cnt==1) or (not(detected)), visual_on=VISUAL_ON)
 
+        # Resize
+        res = cv2.resize(res, (res.shape[1]//2, res.shape[0]//2))
+        vis_img = cv2.resize(vis_img, (vis_img.shape[1]//2, vis_img.shape[0]//2))
+        new_res = np.concatenate([res,vis_img],axis=1)
         # Write video out
-        cv2.imshow('video', res)
-        out.write(res)
+        cv2.imshow('video', new_res)
+        out.write(new_res)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

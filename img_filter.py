@@ -95,5 +95,12 @@ def filter_fusion(luma_bin, sat_bin, grad_bin, mentor_bin):
     """
     binary = np.zeros_like(luma_bin)
     binary[ (((grad_bin==1) | (sat_bin==1)) & (luma_bin==1)) | (mentor_bin==1) ] = 1
+
+    # Erosion and dilation - Seems doesn't work. Mask-off
+    #kernel = np.ones((5,5))
+    #binary_dilation = cv2.dilate(binary, kernel, iterations=1)
+    #binary_erosion = cv2.erode(binary_dilation, kernel, iterations=1)
+    #binary = binary_erosion
+
     return binary
 

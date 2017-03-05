@@ -318,8 +318,8 @@ class lane():
         # Calculate curvature and car position
         curverad, off_center = self.cal_curvature(binary_warped)
         # Write onto the image
-        cv2.putText(lane_shadow_on_road_img, 'Curverad = '+str(curverad)+'m', (50,50), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
-        cv2.putText(lane_shadow_on_road_img, 'Off center = '+str(off_center)+'m (negative means left)', (50,100), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+        cv2.putText(lane_shadow_on_road_img, 'Curverad = '+'%.1f'%curverad+'m', (50,50), cv2.FONT_HERSHEY_PLAIN, 3, (255,255,255), 2)
+        cv2.putText(lane_shadow_on_road_img, 'Off center = '+'%.2f'%off_center+'m (negative means left)', (50,100), cv2.FONT_HERSHEY_PLAIN, 3, (255,255,255), 2)
 
         # Alpha blending with undistorted image.
         res = cv2.addWeighted(image, 1, lane_shadow_on_road_img, 0.3, 0)
