@@ -33,6 +33,8 @@ Highlights of this project:
 [image7]: ./camera_cal/added_rgb_axis.jpg
 [video1]: ./project_video.mp4 "Video"
 [image8]: ./camera_cal/Pinhole_camera_Intrinsics_Extrinsics.gif "Camera intrinsics and Extrinsics" 
+[image9a]: ./markdown/PerspectiveTransformExplained_1.png 
+[image9b]: ./markdown/PerspectiveTransformExplained_2.png 
 
 
 ## Implementation Details 
@@ -191,6 +193,11 @@ I verified that my perspective transform was working as expected by drawing the 
 
 Verified on another sample image after warping:
 ![alt text][image4a]
+
+Theory behind the perspective transform matrix can be found from Coursera course Robotics Perception by Univ. Pensyvania, week2 assignment notes. 
+
+![alt text][image9a]
+![alt text][image9b]
 
 ####4. Lane-line detection using polynomial
 
