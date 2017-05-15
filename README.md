@@ -32,24 +32,35 @@ Highlights of this project:
 [image6b]: ./test_images/curverad_3.png "Cuve lane and car sits left"
 [image7]: ./camera_cal/added_rgb_axis.jpg
 [video1]: ./project_video.mp4 "Video"
+[image8]: ./camera_cal/Pinhole_camera_Intrinsics_Extrinsics.gif "Camera intrinsics and Extrinsics" 
 
-## [Rubric Points](https://review.udacity.com/#!/rubrics/571/view)
-###Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
+## Implementation Details 
 
 ---
-###Writeup / README
-
-####1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.
-
-You're reading it!
 
 ###Camera Calibration
 
-####1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
+####1. Camera intrinsic matrix and distortion coefficients.
 
 The OpenCV checkerboard calibration program is based on Professor Z. Zhang's paper "Z. Zhang. "A flexible new technique for camera calibration".". 
 
-OpenCV implementation source code can be found [here](https://github.com/opencv/opencv/blob/master/modules/calib3d/src/calibration.cpp). 
+Calibration process calculates intrinsics (camera 3D coordinates to image 2D coordinates using pinhole camera model) and extrinsics (Rotation R and Translation T from world 3D coordinates to camera 3D coordinates). [Mathoworks explanation page](https://www.mathworks.com/help/vision/ug/camera-calibration.html) on this. 
+
+OpenCV implementation source code can be found [here](https://github.com/opencv/opencv/blob/master/modules/calib3d/src/calibration.cpp). The OpenCV implementation involves non-linear optimization, such as Levenberg-Marquardt method, as it is a non-linear model, such as the distortion models. 
+
+$$\lambda \begin{bmatrix}
+u \\ 
+v \\ 
+1
+\end{bmatrix} = 
+K_{3X3} * R_{3X4} * 
+\begin{bmatrix}
+x \\ 
+y \\ 
+z \\
+1
+\end{bmatrix} + T_{3X1}$$
+
 
 The code for this step is contained in lines 18 through 71 of file camera_cal.py.  
 
@@ -88,13 +99,13 @@ Draw the "world coordinates axises" on one of the checkerboard image.
 
 ```
 
-Axises are lines connecting above points. Please be noticed the Z axis is negative. Also, the abosolute dimension is missing here, which is unnecessary to derive camera intrinsic and extrinsic matrices in calibration process for mono-camera using Zhang's method. 
+Axises are lines connecting above points. Please be noticed **the Z axis is negative**. Also, the abosolute dimension is missing here, which is unnecessary to derive camera intrinsic and extrinsic matrices in calibration process for mono-camera using Zhang's method. 
 
 ![alt text][image7]
 
 ###Pipeline (single images)
 
-####1. Provide an example of a distortion-corrected image.
+####1. Distortion-corrected image
 Loading previously saved parameters in pickle file when I did camera calibration using checkerboard, I used OpenCV API undistort to do image distortion-correction before any further processing as below. 
 
 ```python
@@ -110,7 +121,8 @@ mpimg.imsave("test_images/test1_undistorted.png", image)
 The distortion-corrected image example:
 ![alt text][image2a]
 
-####2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
+####2. Thresholded binary image 
+
 I used a combination of AOI (area of interest), color and gradient thresholds to generate a binary image.  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
 
 ```python
@@ -143,7 +155,7 @@ I used a combination of AOI (area of interest), color and gradient thresholds to
 ```
 ![alt text][image3]
 
-####3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
+####3. Perspective transform for Birds-Eye-View
 
 The code for my perspective transform includes a function called `warper()`, which appears in top lines in the file `perspective.py`.  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
 
@@ -181,7 +193,7 @@ I verified that my perspective transform was working as expected by drawing the 
 Verified on another sample image after warping:
 ![alt text][image4a]
 
-####4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
+####4. Lane-line detection using polynomial
 
 Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this in lane_detector.py:
 
@@ -221,7 +233,7 @@ All the lane line pixels are saved for polynominal fit calculation.
 
 The `left_fit/right_fit` values (shape=[1,3]) are updated for each input frame image. Except for the very 1st frame when left_fit/right_fit don't exist, all follow up frames can do "smarter" window search along previous frame fit curve.
 
-####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
+####5. Radius of curvature of the lane and the position of the vehicle with respect to center
 
 The detected lane is fit to a 2nd order polynomial curve $$f(y)=Ay^2+By+C$$.
 
@@ -266,7 +278,7 @@ I did these in function cal_curvature in my code in `lane.py`:
 ```
 
 
-####6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
+####6. Example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
 I implemented this step in function draw_lane_area() in my code in `lane.py`.  Here is a few examples of my result on a test image:
 
@@ -277,7 +289,7 @@ I implemented this step in function draw_lane_area() in my code in `lane.py`.  H
 
 ###Pipeline (video)
 
-####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
+####1. Final video output.  
 
 Here's a [link to my video result](./project_video_output.avi)
 
@@ -285,7 +297,7 @@ Here's a [link to my video result](./project_video_output.avi)
 
 ###Discussion
 
-####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+####1. Problems / issues and TODO list
 
 Current implementation failed with both challenge videos. These are the challenges:
 1. Several vertical edges sit close to each other (such as in challenge_video.mp4), which easily confuses the searching window. This has to be resolved using better binary filter technique, probably adaptive ones. 
