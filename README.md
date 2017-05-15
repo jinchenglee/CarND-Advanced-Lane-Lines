@@ -4,7 +4,7 @@
 
 ![alt text][animation0] 
 
-As part of Udacity Autonomous Driving Nano-Degree, the goals / steps of this project are the following:
+Highlights of this project:
 
 * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
 * Apply a distortion correction to raw images.
@@ -18,8 +18,8 @@ As part of Udacity Autonomous Driving Nano-Degree, the goals / steps of this pro
 [//]: # (Image References)
 
 [animation0]: ./project_output.gif "Animation"
-[image0]: ./camera_cal/calibration1.jpg "Distorted"
-[image1]: ./camera_cal/test_undist.jpg "Undistorted"
+[image0]: ./camera_cal/test_dist.markdown.jpg "Distorted"
+[image1]: ./camera_cal/test_undist.markdown.jpg "Undistorted"
 [image2]: ./test_images/test1.jpg "Road Original"
 [image2a]: ./test_images/test1_undistorted.png "Road Transformed"
 [image3]: ./test_images/test1_binary.png "Binary Example"
